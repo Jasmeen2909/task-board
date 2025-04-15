@@ -1,10 +1,16 @@
 import { useState } from "react";
 import { supabase } from "../supabaseClient";
 import "../App.css";
+import Logo from "../assets/Logo.png";
+import Frame from "../assets/Frame.png";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { toast } from 'react-hot-toast';
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -14,44 +20,74 @@ export default function Login() {
     });
 
     if (error) {
-      alert("Login failed: " + error.message);
+      toast.error("Login failed: " + error.message);
     } else {
-      alert("Login successful!");
-      window.location.href = "/dashboard";
+      toast.success("Login successful!");
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 1000);
     }
   };
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-100">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm"
-      >
-        <h2 className="text-xl font-bold mb-4 text-center">Login</h2>
-        <input
-          type="email"
-          placeholder="Your email"
-          className="border p-2 w-full mb-4"
-          onChange={(e) => setEmail(e.target.value)}
-          required
+    <div className="flex h-screen w-full">
+      <div className="w-1/2 bg-gray-50 flex items-center justify-center">
+        <img
+          src={Frame}
+          alt="Login Illustration"
+          className="max-w-3xl w-full"
         />
-        <input
-          type="password"
-          placeholder="Your password"
-          className="border p-2 w-full mb-4"
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button className="bg-blue-500 text-white px-4 py-2 rounded w-full">
-          Login
-        </button>
-        <p className="text-sm text-center mt-4">
-          Don't have an account?{" "}
-          <a href="/signup" className="text-blue-500 hover:underline">
-            Sign up
-          </a>
-        </p>
-      </form>
+      </div>
+
+      <div className="w-1/2 flex flex-col items-center justify-center bg-white">
+        <div className="w-full max-w-lg mb-4">
+          <img src={Logo} alt="Novumlogic Logo" className="" />
+        </div>
+
+        <form
+          onSubmit={handleLogin}
+          className="bg-white p-10 rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.1)] w-full max-w-lg"
+        >
+          <h2 className="text-2xl font-semibold mb-4">Login</h2>
+
+          <input
+            type="email"
+            placeholder="Email"
+            className="border border-gray-400 p-2 w-full mb-4 rounded"
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <div className="relative mb-4">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              className="border border-gray-400 p-2 w-full rounded pr-10"
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <span
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 cursor-pointer text-gray-600"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-sm mb-4">
+            <label className="flex items-center">
+              <input type="checkbox" className="mr-2" />
+              Remember Me
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            className="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 w-full rounded"
+          >
+            Login
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
