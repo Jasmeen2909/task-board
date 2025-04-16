@@ -13,6 +13,8 @@ import Logo from "../assets/Logo.png";
 import { DateRange } from "react-date-range";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
+import { Link } from "react-router-dom";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState([]);
@@ -37,7 +39,51 @@ export default function Dashboard() {
       date_to: dateRange.to,
       limit_count: limit,
     });
-    if (!error) setTasks(data);
+    if (!error) {
+      setTasks(data);
+      const grouped = {};
+      columns.forEach((col) => {
+        grouped[col] = data.filter((task) => task.status === col);
+      });
+      setTasksByStatus(grouped);
+    }
+  };
+
+  const onDragEnd = async (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+
+    // Prevent drop in same place
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    ) {
+      return;
+    }
+
+    const sourceCol = source.droppableId;
+    const destCol = destination.droppableId;
+    const draggedTask = tasksByStatus[sourceCol][source.index];
+
+    // Remove from source, add to destination
+    const newSourceTasks = [...tasksByStatus[sourceCol]];
+    const [movedTask] = newSourceTasks.splice(source.index, 1);
+    movedTask.status = destCol;
+
+    const newDestTasks = [...tasksByStatus[destCol]];
+    newDestTasks.splice(destination.index, 0, movedTask);
+
+    setTasksByStatus({
+      ...tasksByStatus,
+      [sourceCol]: newSourceTasks,
+      [destCol]: newDestTasks,
+    });
+
+    // 🔁 Update status in Supabase via RPC
+    await supabase.rpc("update_task_status", {
+      task_id: movedTask.id,
+      new_status: destCol,
+    });
   };
 
   const getUser = async () => {
@@ -48,6 +94,7 @@ export default function Dashboard() {
   };
 
   const columns = ["To Do", "In Progress", "Done"];
+  const [tasksByStatus, setTasksByStatus] = useState({});
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -63,7 +110,6 @@ export default function Dashboard() {
     },
   ]);
 
-
   return (
     <div className="flex h-screen overflow-hidden">
       <aside
@@ -77,14 +123,20 @@ export default function Dashboard() {
               {sidebarOpen && <img src={Logo} alt="Logo" className="h-10" />}
             </div>
             <nav className="mt-4">
-              <div className="flex items-center my-2 mx-5 px-4 py-2 text-md font-medium hover:bg-orange-600 hover:text-white cursor-pointer rounded-lg">
+              <Link
+                to="/dashboard"
+                className="flex items-center my-2 mx-5 px-4 py-2 text-md font-medium hover:bg-orange-600 hover:text-white cursor-pointer rounded-lg"
+              >
                 <FontAwesomeIcon icon={faTachometerAlt} className="mr-2" />
                 {sidebarOpen && "Dashboard"}
-              </div>
-              <div className="flex items-center my-2 mx-5 px-4 py-2 text-md font-medium hover:bg-orange-600 hover:text-white cursor-pointer rounded-lg">
+              </Link>
+              <Link
+                to="/discard"
+                className="flex items-center my-2 mx-5 px-4 py-2 text-md font-medium hover:bg-orange-600 hover:text-white cursor-pointer rounded-lg"
+              >
                 <FontAwesomeIcon icon={faTrashAlt} className="mr-2" />
                 {sidebarOpen && "Discard"}
-              </div>
+              </Link>
             </nav>
           </div>
         </div>
@@ -141,13 +193,13 @@ export default function Dashboard() {
               <input
                 type="text"
                 placeholder="Search"
-                className="border pl-10 pr-4 py-2 rounded text-sm w-48 bg-white"
+                className="border border-gray-300 pl-10 pr-4 py-2 rounded text-sm w-48 bg-white"
               />
             </div>
 
             <select
               onChange={(e) => setStatusFilter(e.target.value || null)}
-              className="border px-3 py-2 rounded text-sm w-32 bg-white"
+              className="border border-gray-300 px-3 py-2 rounded text-sm w-32 bg-white"
             >
               <option value="">Status</option>
               <option value="To Do">To Do</option>
@@ -156,7 +208,7 @@ export default function Dashboard() {
             </select>
             <select
               onChange={(e) => setCategoryFilter(e.target.value || null)}
-              className="border px-3 py-2 rounded text-sm w-32 bg-white"
+              className="border border-gray-300 px-3 py-2 rounded text-sm w-32 bg-white"
             >
               <option value="">Category</option>
               <option value="Bug">Bug</option>
@@ -166,7 +218,7 @@ export default function Dashboard() {
             <div className="relative">
               <button
                 onClick={() => setCalendarOpen(!calendarOpen)}
-                className="border px-3 py-2 rounded text-sm w-48 text-left bg-white"
+                className="border border-gray-300 px-3 py-2 rounded text-sm w-48 text-left bg-white"
               >
                 {range[0].startDate.toLocaleDateString()} -{" "}
                 {range[0].endDate.toLocaleDateString()}
@@ -191,7 +243,7 @@ export default function Dashboard() {
 
             <select
               onChange={(e) => setLimit(Number(e.target.value) || null)}
-              className="border px-3 py-2 rounded text-sm w-32 bg-white"
+              className="border border-gray-300 px-3 py-2 rounded text-sm w-32 bg-white"
             >
               <option value="">Limit</option>
               <option value="5">5</option>
@@ -200,43 +252,57 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            {columns.map((col) => (
-              <div key={col} className="bg-white rounded-lg shadow p-4">
-                <div className="font-semibold mb-2 flex items-center">
-                  <span
-                    className={`w-3 h-3 rounded-full mr-2 ${
-                      col === "To Do"
-                        ? "bg-yellow-500"
-                        : col === "In Progress"
-                        ? "bg-blue-500"
-                        : "bg-green-500"
-                    }`}
-                  ></span>
-                  {col}
-                </div>
-                <div className="space-y-4">
-                  {tasks.filter((task) => task.status === col).length === 0
-                    ? col === "Done" && (
-                        <div className="text-center text-gray-400">No Task</div>
-                      )
-                    : tasks
-                        .filter((task) => task.status === col)
-                        .map((task) => (
-                          <div
-                            key={task.id}
-                            className="bg-gray-50 p-3 rounded shadow hover:shadow-md cursor-pointer"
-                          >
-                            <h2 className="font-semibold">{task.title}</h2>
-                            <p className="text-sm text-gray-600">
-                              {task.description}
-                            </p>
-                          </div>
-                        ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="grid grid-cols-3 gap-4">
+              {columns.map((col) => (
+                <Droppable droppableId={String(col)} key={col}>
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="bg-white rounded-lg shadow p-4 min-h-[300px]"
+                    >
+                      <div className="font-semibold mb-2 flex items-center">
+                        <span
+                          className={`w-3 h-3 rounded-full mr-2 ${
+                            col === "To Do"
+                              ? "bg-yellow-500"
+                              : col === "In Progress"
+                              ? "bg-blue-500"
+                              : "bg-green-500"
+                          }`}
+                        />
+                        {col}
+                      </div>
+
+                      {tasksByStatus[col]?.map((task, index) => (
+                        <Draggable
+                          key={task.id}
+                          draggableId={task.id.toString()}
+                          index={index}
+                        >
+                          {(provided) => (
+                            <div
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              ref={provided.innerRef}
+                              className="bg-gray-50 p-3 rounded shadow hover:shadow-md cursor-pointer mb-3"
+                            >
+                              <h2 className="font-semibold">{task.title}</h2>
+                              <p className="text-sm text-gray-600 line-clamp-3">
+                                {task.description}
+                              </p>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              ))}
+            </div>
+          </DragDropContext>
         </div>
       </div>
     </div>
